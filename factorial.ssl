@@ -1,0 +1,10 @@
+h # Set X
+q # Duplicate x (z)
+d # Decrement z (y)
+t # Begin loop
+	m # Multiply y by x
+	l # Swap result and y
+	d # Decrement y
+u # End loop
+b # Pop remaining 0
+x # Print (x!)
