@@ -5,16 +5,16 @@ const Allocator = mem.Allocator;
 
 pub const Prog = struct {
 	const Self = @This();
-	const DEFAULT_STACK_SIZE : u32 = 256;
+	const DEFAULT_STACK_SIZE: u32 = 256;
 
 	_allocator: Allocator,
 	prog: []u8,
 	stack: std.ArrayList(i32),
 
 	pub const Samples = struct {
-		pub const prog_hello_world:[] const u8 = "avqmimcfdddfviiffvddfavdegmfavdmcwfwdddfvddfwdfwdddf";
-		pub const prog_cat:[] const u8 = "jf";
-		pub const prog_factorial:[] const u8 =
+		pub const PROG_HELLO_WORLD: [] const u8 = "avqmimcfdddfviiffvddfavdegmfavdmcwfwdddfvddfwdfwdddf";
+		pub const PROG_CAT: [] const u8 = "jf";
+		pub const PROG_FACTORIAL: [] const u8 =
 			\\h # Set X
 			\\q # Duplicate x (z)
 			\\d # Decrement z (y)
@@ -335,7 +335,7 @@ pub const Prog = struct {
 test "basic functionality" {
 	var prog = try Prog.init(std.testing.allocator);
 	defer prog.deinit();
-	const len = try prog.compile(Prog.Samples.prog_hello_world);
+	const len = try prog.compile(Prog.Samples.PROG_HELLO_WORLD);
 	std.debug.print("Prog {d} symbols:\n",.{len});
 
 	var threaded: std.Io.Threaded = .init_single_threaded;

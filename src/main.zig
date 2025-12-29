@@ -35,7 +35,7 @@ pub fn main() !void {
 		// and calculating its factorial.
 		var prog_factorial = try SillyStack.Prog.init(allocator);
 		defer prog_factorial.deinit();
-		_ = try prog_factorial.compile(SillyStack.Prog.Samples.prog_factorial);
+		_ = try prog_factorial.compile(SillyStack.Prog.Samples.PROG_FACTORIAL);
 		try prog_factorial.run(io);
 	} else {
 		const file_path = args[1];
