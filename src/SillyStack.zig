@@ -54,6 +54,36 @@ pub const Prog = struct {
 		return self.stack.getLastOrNull();
 	}
 
+	pub fn getTopVal(self: *Self) RuntimeError!i32 {
+		if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
+		return self.stack.getLast();
+	}
+
+	pub fn setTopVal(self: *Self, val:i32) RuntimeError!i32 {
+		if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
+		self.stack.items[self.stack.items.len - 1] = val;
+	}
+
+	pub fn incTopVal(self: *Self, val:i32) RuntimeError!void {
+		if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
+		self.stack.items[self.stack.items.len - 1] += val;
+	}
+
+	fn getTop2Idx(self: *Self) RuntimeError!struct { usize, usize } {
+		if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
+		const idx0 = self.stack.items.len - 1;
+		const idx1 = self.stack.items.len - 2;
+		return .{idx0, idx1};
+	}
+
+	fn getTop2Val(self: *Self) RuntimeError!struct { a: i32, b: i32 } {
+		if (self.stack.items.len < 2) return RuntimeError.BadStackAccess;
+		return .{
+			.a = self.stack.items[self.stack.items.len - 1],
+			.b = self.stack.items[self.stack.items.len - 2],
+		};
+	}
+
 	pub const ProcessError = error {
 		SyntaxError,
 		AllocationFailed
@@ -61,6 +91,7 @@ pub const Prog = struct {
 
 	pub const RuntimeError = error {
 		BadStackAccess,
+		BadOffset,
 		CmdNotImplemented,
 		UnmatchedLoop,
 	};
@@ -141,11 +172,9 @@ pub const Prog = struct {
 				'a' => try self.stack.append(self._allocator, 0),
 				'b' => _ = self.stack.pop(),
 				'c' => {
-					if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
+					const vals = try self.getTop2Val();
 
-					const idx0 = self.stack.items.len - 1;
-					const idx1 = self.stack.items.len - 2;
-					try self.stack.append(self._allocator, (self.stack.items[idx0] - self.stack.items[idx1]));
+					try self.stack.append(self._allocator, (vals.a - vals.b));
 				},
 				'd' => {
 					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
@@ -153,24 +182,19 @@ pub const Prog = struct {
 					self.stack.items[self.stack.items.len - 1] -= 1;
 				},
 				'e' => {
-					if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
+					const vals = try self.getTop2Val();
 
-					const idx0 = self.stack.items.len - 1;
-					const idx1 = self.stack.items.len - 2;
-
-					try self.stack.append(self._allocator, @mod(self.stack.items[idx0], self.stack.items[idx1]));
+					try self.stack.append(self._allocator, @mod(vals.a, vals.b));
 				},
 				'f' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-					const ch:u8 = convertToU8(self.stack.getLast());
-					std.debug.print("{c}\n",.{ch});
+					const top_val = try self.getTopVal();
+					const ch:u8 = convertToU8(top_val);
+					std.debug.print("{c}",.{ch});
 				},
 				'g' => {
-					if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
+					const vals = try self.getTop2Val();
 
-					const idx0 = self.stack.items.len - 1;
-					const idx1 = self.stack.items.len - 2;
-					try self.stack.append(self._allocator, (self.stack.items[idx0] + self.stack.items[idx1]));
+					try self.stack.append(self._allocator, (vals.a + vals.b));
 				},
 				'h' => {
 					const inp_val = try stdin_ifc.takeDelimiterExclusive('\n');
@@ -191,8 +215,7 @@ pub const Prog = struct {
 					}
 				},
 				'k' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-					const top_val = self.stack.getLast();
+					const top_val = try self.getTopVal();
 					if (top_val == 0) { skip_next = true; }
 				},
 				'l' => {
@@ -205,18 +228,14 @@ pub const Prog = struct {
 					self.stack.items[idx1] = temp;
 				},
 				'm' => {
-					if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
+					const vals = try self.getTop2Val();
 
-					const idx0 = self.stack.items.len - 1;
-					const idx1 = self.stack.items.len - 2;
-					try self.stack.append(self._allocator, (self.stack.items[idx0] * self.stack.items[idx1]));
+					try self.stack.append(self._allocator, (vals.a * vals.b));
 				},
 				'n' => {
-					if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
+					const vals = try self.getTop2Val();
 
-					const idx0 = self.stack.items.len - 1;
-					const idx1 = self.stack.items.len - 2;
-					try self.stack.append(self._allocator, @as(i32, @intFromBool(self.stack.items[idx0] == self.stack.items[idx1])));
+					try self.stack.append(self._allocator, @as(i32, @intFromBool(vals.a == vals.b)));
 				},
 				'o' => {
 					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
@@ -224,26 +243,20 @@ pub const Prog = struct {
 					_ = self.stack.pop();
 				},
 				'p' => {
-					if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
-
-					const idx0 = self.stack.items.len - 1;
-					const idx1 = self.stack.items.len - 2;
-					try self.stack.append(self._allocator, @divTrunc(self.stack.items[idx0], self.stack.items[idx1]));
+					const vals = try self.getTop2Val();
+					try self.stack.append(self._allocator, @divTrunc(vals.a, vals.b));
 				},
 				'q' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-
-					const top_val = self.stack.getLast();
+					const top_val = try self.getTopVal();
 					try self.stack.append(self._allocator, top_val);
 				},
 				'r' => {
 					try self.stack.append(self._allocator,@as(i32, @intCast(self.stack.items.len)));
 				},
 				's' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
+					const top_val = try self.getTopVal();
+					if (top_val < 0) { return RuntimeError.BadOffset; }
 
-					const top_val = self.stack.getLast();
-					if (top_val < 0) { return RuntimeError.BadStackAccess; }
 					const swap_idx: usize = @intCast(top_val);
 					const top_idx = self.stack.items.len - 1;
 					const temp = self.stack.items[top_idx];
@@ -252,9 +265,7 @@ pub const Prog = struct {
 					self.stack.items[swap_idx] = temp;
 				},
 				't' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-
-					const top_val = self.stack.getLast();
+					const top_val = try self.getTopVal();
 					if (top_val == 0) {
 						var loop_depth: i32 = 1;
 						prog_pos += 1;
@@ -270,9 +281,7 @@ pub const Prog = struct {
 					}
 				},
 				'u' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-
-					const top_val = self.stack.getLast();
+					const top_val = try self.getTopVal();
 					if (top_val != 0) {
 						var loop_depth: i32 = 1;
 						prog_pos -= 1;
@@ -288,18 +297,14 @@ pub const Prog = struct {
 					}
 				},
 				'v' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-
-					self.stack.items[self.stack.items.len - 1] += 5;
+					try self.incTopVal(5);
 				},
 				'w' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-
-					self.stack.items[self.stack.items.len - 1] -= 5;
+					try self.incTopVal(-5);
 				},
 				'x' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
-					std.debug.print("{d}\n",.{self.stack.getLast()});
+					const top_val = try self.getTopVal();
+					std.debug.print("{d}\n",.{top_val});
 				},
 				'y' => {
 					self.clearStack();

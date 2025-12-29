@@ -31,7 +31,7 @@ pub fn main() !void {
 	defer std.process.argsFree(allocator, args);
 
 	if (args.len < 2) {
-		// No args provided - run a sample program requesting to inpur a number
+		// No args provided - run a sample program requesting to input a number
 		// and calculating its factorial.
 		var prog_factorial = try SillyStack.Prog.init(allocator);
 		defer prog_factorial.deinit();
