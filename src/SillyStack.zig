@@ -219,13 +219,8 @@ pub const Prog = struct {
 					if (top_val == 0) { skip_next = true; }
 				},
 				'l' => {
-					if (self.stack.items.len < 2) { return RuntimeError.BadStackAccess; }
-
-					const idx0 = self.stack.items.len - 1;
-					const idx1 = self.stack.items.len - 2;
-					const temp = self.stack.items[idx0];
-					self.stack.items[idx0] = self.stack.items[idx1];
-					self.stack.items[idx1] = temp;
+					const indice = try self.getTop2Idx();
+					std.mem.swap(i32, &self.stack.items[indice[0]], &self.stack.items[indice[1]]);
 				},
 				'm' => {
 					const vals = try self.getTop2Val();
@@ -259,10 +254,8 @@ pub const Prog = struct {
 
 					const swap_idx: usize = @intCast(top_val);
 					const top_idx = self.stack.items.len - 1;
-					const temp = self.stack.items[top_idx];
 
-					self.stack.items[top_idx] = self.stack.items[swap_idx];
-					self.stack.items[swap_idx] = temp;
+					std.mem.swap(i32, &self.stack.items[top_idx], &self.stack.items[swap_idx]);
 				},
 				't' => {
 					const top_val = try self.getTopVal();
