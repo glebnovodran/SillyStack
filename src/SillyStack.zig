@@ -62,6 +62,7 @@ pub const Prog = struct {
 	pub const RuntimeError = error {
 		BadStackAccess,
 		CmdNotImplemented,
+		UnmatchedLoop,
 	};
 
 	fn processProgram(prog: [] const u8, self: ?*Self) ProcessError!usize {
@@ -119,23 +120,23 @@ pub const Prog = struct {
 			};
 	}
 
-
 	pub fn run(self: *Self, io: std.Io) !void {
 		if (self.prog.len == 0) { return; }
-		var prog_pos: u32 = 0;
+		var prog_pos: i32 = 0;
+		const prog_len: i32 = @intCast(self.prog.len);
 		var skip_next: bool = false;
 		self.clearStack();
 		var stdin_buffer: [512]u8 = undefined;
 		var stdin_reader = std.fs.File.stdin().reader(io, &stdin_buffer);
 		const stdin_ifc = &stdin_reader.interface;
 
-		while (prog_pos < self.prog.len) {
+		while (prog_pos < prog_len) {
 			if (skip_next) {
 				skip_next = false;
 				prog_pos += 1;
 				continue;
 			}
-			const cmd = self.prog[prog_pos];
+			const cmd = self.prog[@intCast(prog_pos)];
 			switch (cmd) {
 				'a' => try self.stack.append(self._allocator, 0),
 				'b' => _ = self.stack.pop(),
@@ -243,7 +244,7 @@ pub const Prog = struct {
 
 					const top_val = self.stack.getLast();
 					if (top_val < 0) { return RuntimeError.BadStackAccess; }
-					const swap_idx = @as(u32, @intCast(top_val));
+					const swap_idx: usize = @intCast(top_val);
 					const top_idx = self.stack.items.len - 1;
 					const temp = self.stack.items[top_idx];
 
@@ -255,18 +256,17 @@ pub const Prog = struct {
 
 					const top_val = self.stack.getLast();
 					if (top_val == 0) {
-						var loop_opened:u32 = 1;
+						var loop_depth: i32 = 1;
 						prog_pos += 1;
-						searchU: while (prog_pos < self.prog.len) {
-							if ((self.prog[prog_pos] == 'u') and (loop_opened == 0)) {
-								break :searchU;
-							} else if (self.prog[prog_pos] == 't') {
-								loop_opened += 1;
-							} else if (self.prog[prog_pos] == 'u') {
-								loop_opened -= 1;
+						while (prog_pos < prog_len and loop_depth > 0) {
+							if (self.prog[@intCast(prog_pos)] == 't') {
+								loop_depth += 1;
+							} else if (self.prog[@intCast(prog_pos)] == 'u') {
+								loop_depth -= 1;
 							}
-							prog_pos += 1;
+							if (loop_depth > 0) prog_pos += 1;
 						}
+						if (loop_depth != 0) { return RuntimeError.UnmatchedLoop; }
 					}
 				},
 				'u' => {
@@ -274,18 +274,17 @@ pub const Prog = struct {
 
 					const top_val = self.stack.getLast();
 					if (top_val != 0) {
-						var loop_closed:u32 = 0;
+						var loop_depth: i32 = 1;
 						prog_pos -= 1;
-						searchT: while (prog_pos >= 0) {
-							if ((self.prog[prog_pos] == 't') and (loop_closed == 0)) {
-								break :searchT;
-							} else if (self.prog[prog_pos] == 'u') {
-								loop_closed += 1;
-							} else if (self.prog[prog_pos] == 't') {
-								loop_closed -= 1;
+						while (prog_pos >= 0 and loop_depth > 0) {
+							if (self.prog[@intCast(prog_pos)] == 'u') {
+								loop_depth += 1;
+							} else if (self.prog[@intCast(prog_pos)] == 't') {
+								loop_depth -= 1;
 							}
-							prog_pos -= 1;
+							if (loop_depth > 0) prog_pos -= 1;
 						}
+						if (loop_depth != 0) { return RuntimeError.UnmatchedLoop; }
 					}
 				},
 				'v' => {
@@ -313,7 +312,6 @@ pub const Prog = struct {
 			prog_pos += 1;
 		}
 	}
-
 	pub fn analyze(prog: []const u8) ProcessError!usize {
 		std.debug.print("\nANALYZING\n", .{});
 		return try processProgram(prog, null);
