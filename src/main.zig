@@ -34,6 +34,7 @@ pub fn main() !void {
 		// No args provided - run a sample program requesting to inpur a number
 		// and calculating its factorial.
 		var prog_factorial = try SillyStack.Prog.init(allocator);
+		defer prog_factorial.deinit();
 		_ = try prog_factorial.compile(SillyStack.Prog.Samples.prog_factorial);
 		try prog_factorial.run(io);
 	} else {
