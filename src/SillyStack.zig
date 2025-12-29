@@ -127,7 +127,7 @@ pub const Prog = struct {
 		var skip_next: bool = false;
 		self.clearStack();
 		var stdin_buffer: [512]u8 = undefined;
-		var stdin_reader = std.fs.File.stdin().reader(io, &stdin_buffer);
+		var stdin_reader = std.Io.File.stdin().reader(io, &stdin_buffer);
 		const stdin_ifc = &stdin_reader.interface;
 
 		while (prog_pos < prog_len) {
