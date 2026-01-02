@@ -59,7 +59,7 @@ pub const Prog = struct {
 		return self.stack.getLast();
 	}
 
-	pub fn setTopVal(self: *Self, val:i32) RuntimeError!i32 {
+	pub fn setTopVal(self: *Self, val:i32) RuntimeError!void {
 		if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
 		self.stack.items[self.stack.items.len - 1] = val;
 	}
@@ -167,45 +167,47 @@ pub const Prog = struct {
 				prog_pos += 1;
 				continue;
 			}
+
 			const cmd = self.prog[@intCast(prog_pos)];
+
 			switch (cmd) {
 				'a' => try self.stack.append(self._allocator, 0),
+
 				'b' => _ = self.stack.pop(),
+
 				'c' => {
 					const vals = try self.getTop2Val();
-
 					try self.stack.append(self._allocator, (vals.a - vals.b));
 				},
-				'd' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
 
-					self.stack.items[self.stack.items.len - 1] -= 1;
-				},
+				'd' => try self.incTopVal(-1),
+
 				'e' => {
 					const vals = try self.getTop2Val();
 
 					try self.stack.append(self._allocator, @mod(vals.a, vals.b));
 				},
+
 				'f' => {
 					const top_val = try self.getTopVal();
 					const ch:u8 = convertToU8(top_val);
 					std.debug.print("{c}",.{ch});
 				},
+
 				'g' => {
 					const vals = try self.getTop2Val();
 
 					try self.stack.append(self._allocator, (vals.a + vals.b));
 				},
+
 				'h' => {
 					const inp_val = try stdin_ifc.takeDelimiterExclusive('\n');
 					const parsed = try std.fmt.parseInt(i32, inp_val, 10);
 					try self.stack.append(self._allocator, parsed);
 				},
-				'i' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
 
-					self.stack.items[self.stack.items.len - 1] += 1;
-				},
+				'i' => try self.incTopVal(1),
+
 				'j' => {
 					const chars = try stdin_ifc.takeDelimiter('\n');
 					if (chars) |chrs| {
@@ -214,40 +216,45 @@ pub const Prog = struct {
 						}
 					}
 				},
+
 				'k' => {
 					const top_val = try self.getTopVal();
 					if (top_val == 0) { skip_next = true; }
 				},
+
 				'l' => {
 					const indice = try self.getTop2Idx();
 					std.mem.swap(i32, &self.stack.items[indice[0]], &self.stack.items[indice[1]]);
 				},
+
 				'm' => {
 					const vals = try self.getTop2Val();
 
 					try self.stack.append(self._allocator, (vals.a * vals.b));
 				},
+
 				'n' => {
 					const vals = try self.getTop2Val();
 
 					try self.stack.append(self._allocator, @as(i32, @intFromBool(vals.a == vals.b)));
 				},
-				'o' => {
-					if (self.stack.items.len == 0) { return RuntimeError.BadStackAccess; }
 
-					_ = self.stack.pop();
-				},
+				'o' => _ = self.stack.pop(),
+
 				'p' => {
 					const vals = try self.getTop2Val();
 					try self.stack.append(self._allocator, @divTrunc(vals.a, vals.b));
 				},
+
 				'q' => {
 					const top_val = try self.getTopVal();
 					try self.stack.append(self._allocator, top_val);
 				},
+
 				'r' => {
 					try self.stack.append(self._allocator,@as(i32, @intCast(self.stack.items.len)));
 				},
+
 				's' => {
 					const top_val = try self.getTopVal();
 					if (top_val < 0) { return RuntimeError.BadOffset; }
@@ -257,6 +264,7 @@ pub const Prog = struct {
 
 					std.mem.swap(i32, &self.stack.items[top_idx], &self.stack.items[swap_idx]);
 				},
+
 				't' => {
 					const top_val = try self.getTopVal();
 					if (top_val == 0) {
@@ -273,6 +281,7 @@ pub const Prog = struct {
 						if (loop_depth != 0) { return RuntimeError.UnmatchedLoop; }
 					}
 				},
+
 				'u' => {
 					const top_val = try self.getTopVal();
 					if (top_val != 0) {
@@ -289,27 +298,28 @@ pub const Prog = struct {
 						if (loop_depth != 0) { return RuntimeError.UnmatchedLoop; }
 					}
 				},
-				'v' => {
-					try self.incTopVal(5);
-				},
-				'w' => {
-					try self.incTopVal(-5);
-				},
+
+				'v' => try self.incTopVal(5),
+
+				'w' => try self.incTopVal(-5),
+
 				'x' => {
 					const top_val = try self.getTopVal();
 					std.debug.print("{d}\n",.{top_val});
 				},
-				'y' => {
-					self.clearStack();
-				},
-				'z' => {
-					return;
-				},
+
+				'y' => self.clearStack(),
+
+				'z' => return,
+
 				else => std.debug.print("Invalid character {c} at {d}\n", .{cmd, prog_pos}),
 			}
+
 			prog_pos += 1;
+
 		}
 	}
+
 	pub fn analyze(prog: []const u8) ProcessError!usize {
 		std.debug.print("\nANALYZING\n", .{});
 		return try processProgram(prog, null);
@@ -393,3 +403,20 @@ test "Bad syntax" {
 	}
 	try expect(true);
 }
+
+test "Unmatched loop u" {
+	var ssl_prog = try Prog.init(std.testing.allocator);
+	defer ssl_prog.deinit();
+	_ = try ssl_prog.compile("avu");
+
+	var threaded: std.Io.Threaded = .init_single_threaded;
+	defer threaded.deinit();
+	const io = threaded.io();
+
+	if (ssl_prog.run(io)) |_| {
+		try expect(false);
+	} else |err| {
+		try expect(err == Prog.RuntimeError.UnmatchedLoop);
+	}
+}
+
