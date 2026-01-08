@@ -7,7 +7,7 @@ pub fn readFileToString(allocator: std.mem.Allocator, io: std.Io, file_path: []c
 	var file = try cwd.openFile(io, file_path, .{.mode = .read_only});
 	defer file.close(io);
 
-	var stat = try file.stat(io);
+	const stat = try file.stat(io);
 	const prog_buf = try allocator.alloc(u8, stat.size);
 	errdefer allocator.free(prog_buf);
 
@@ -33,6 +33,7 @@ pub fn main() !void {
 	if (args.len < 2) {
 		// No args provided - run a sample program requesting to input a number
 		// and calculating its factorial.
+		std.debug.print("No programm provided, running the factorail calculating sample:\n", .{});
 		var prog_factorial = try SillyStack.Prog.init(allocator);
 		defer prog_factorial.deinit();
 		_ = try prog_factorial.compile(SillyStack.Prog.Samples.PROG_FACTORIAL);

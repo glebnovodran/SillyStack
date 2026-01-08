@@ -321,12 +321,10 @@ pub const Prog = struct {
 	}
 
 	pub fn analyze(prog: []const u8) ProcessError!usize {
-		std.debug.print("\nANALYZING\n", .{});
 		return try processProgram(prog, null);
 	}
 
 	pub fn compile(self: *Self, prog: []const u8) ProcessError!usize {
-		std.debug.print("\nCOMPILING\n", .{});
 		return try processProgram(prog, self);
 	}
 
